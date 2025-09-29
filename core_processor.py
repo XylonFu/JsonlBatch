@@ -13,14 +13,14 @@ from typing import Callable, Dict, Any, List, Coroutine, TypeAlias
 
 import aiofiles
 import aiohttp
-import aiologger
+from aiologger import logger as aiologger
 from tqdm import tqdm
 
 # --- 类型别名，用于清晰地定义函数签名 ---
 ProcessFunction: TypeAlias = Callable[[Dict[str, Any], Dict[str, Any]], Coroutine[Any, Any, Dict[str, Any] | None]]
 LifecycleHook: TypeAlias = Callable[..., Coroutine[Any, Any, Any]]
 
-logger = aiologger.getLogger(__name__)
+logger = aiologger.get_logger(__name__)
 
 class JsonlBatchProcessor:
     """用于网络I/O密集型任务的异步JSONL文件处理器。"""
