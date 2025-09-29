@@ -9,23 +9,32 @@ import asyncio
 import json
 import os
 import time
-from typing import Callable, Dict, Any, List, Coroutine, TypeAlias
+from typing import Callable, Dict, Any, List, Coroutine, TypeAlias, Protocol
 
 import aiofiles
 import aiohttp
-from aiologger import logger as aiologger
+from aiologger import logger
 from tqdm import tqdm
 
-# --- 类型别名，用于清晰地定义函数签名 ---
+# --- 类型定义，用于清晰地定义接口和函数签名 ---
 ProcessFunction: TypeAlias = Callable[[Dict[str, Any], Dict[str, Any]], Coroutine[Any, Any, Dict[str, Any] | None]]
 LifecycleHook: TypeAlias = Callable[..., Coroutine[Any, Any, Any]]
 
-logger = aiologger.get_logger(__name__)
+class ConfigProtocol(Protocol):
+    """定义期望的配置对象的结构（“形状”），用于更严格的类型提示。"""
+    INPUT_FILE: str
+    OUTPUT_FILE: str
+    ERROR_FILE: str
+    LOG_FILE: str
+    ID_KEY: str
+    RERUN_KEY: str | None
+    MAX_CONCURRENCY: int
+    WRITE_BATCH_SIZE: int
 
 class JsonlBatchProcessor:
     """用于网络I/O密集型任务的异步JSONL文件处理器。"""
 
-    def __init__(self, config: object):
+    def __init__(self, config: ConfigProtocol):
         self.config = config
         self.processed_ids: set = set()
         self._file_write_lock = asyncio.Lock()
@@ -88,8 +97,8 @@ class JsonlBatchProcessor:
                 async with aiofiles.open(file_path, 'a', encoding='utf-8') as f:
                     for item in batch:
                         await f.write(json.dumps(item, ensure_ascii=False) + '\n')
-        except IOError:
-            await logger.error(f"异步写入文件 '{file_path}' 失败", exc_info=True)
+        except OSError as e:
+            await logger.error(f"异步写入文件 '{file_path}' 失败: {e}", exc_info=True)
 
     async def _run_processing_loop(self, tasks: List, process_func: ProcessFunction, context: Dict) -> tuple[int, int]:
         """内部异步循环，负责并发执行、结果收集和进度显示。"""

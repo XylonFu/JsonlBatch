@@ -6,13 +6,9 @@
 包括：资源初始化(`on_startup`)、核心处理(`process_record`)和资源清理(`on_shutdown`)。
 """
 from typing import Dict, Any
-from aiologger import logger as aiologger
+from aiologger import logger
 
-# 从工具模块导入可复用的组件
 from utils import retry_with_backoff
-
-# 获取一个异步 logger 实例
-logger = aiologger.get_logger(__name__)
 
 # ==============================================================================
 # 1. 定义生命周期钩子 (Lifecycle Hooks)
@@ -83,6 +79,6 @@ async def process_record(record: Dict[str, Any], context: Dict[str, Any]) -> Dic
         response.raise_for_status()
         api_data = await response.json()
         
-        record["processed_by"] = "JsonlBatch v3.2 Final"
+        record["processed_by"] = "JsonlBatch v4.0 Final"
         record["api_args"] = api_data["args"]
         return record

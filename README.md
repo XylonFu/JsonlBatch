@@ -40,6 +40,13 @@ your_project/
 └── main.py               # The application's generic entry point.
 ```
 
+## Dependencies
+
+  - `aiohttp`
+  - `tqdm`
+  - `aiofiles`
+  - `aiologger`
+
 ## Getting Started
 
 #### 1\. Installation
@@ -82,8 +89,8 @@ The framework interacts with your code through a clear contract defined in `user
   - `on_startup() -> dict`:
     This coroutine runs **once** before any processing begins. Its purpose is to initialize and return a `context` dictionary containing any shared resources (e.g., SDK clients, database connection pools).
 
-  - `process_record(record: dict, context: dict) -> dict`:
-    This is your main worker coroutine. It runs concurrently for **each line** in your input file. It receives the data `record` for one line and the shared `context` object. Its job is to perform the desired operation and return the resulting dictionary to be saved.
+  - `process_record(record: dict, context: dict) -> dict | None`:
+    This is your main worker coroutine. It runs concurrently for **each line** in your input file. It receives the data `record` for one line and the shared `context` object. Its job is to perform the desired operation and return the resulting dictionary to be saved. Returning `None` will skip saving a result for that record.
 
   - `on_shutdown(context: dict)`:
     This coroutine runs **once** after all processing is finished (even if errors occurred). Use it to gracefully clean up and release the resources created in `on_startup`.
@@ -119,7 +126,7 @@ class Settings:
 from typing import Dict, Any
 from utils import retry_with_backoff
 
-# No special resources needed, so startup/shutdown are simple.
+# No special resources are needed for this simple task.
 async def on_startup() -> Dict[str, Any]:
     return {}
 
@@ -161,7 +168,7 @@ The `utils.py` module provides a powerful `@retry_with_backoff` decorator. Apply
 
 ### Handling Synchronous SDKs
 
-If you must use a blocking library, wrap the blocking call in `await asyncio.to_thread(...)` to prevent it from stalling the framework.
+If you must use a blocking library (e.g., a synchronous database driver), wrap the blocking call in `await asyncio.to_thread(...)` to keep the framework responsive.
 
 ```python
 # Inside process_record
@@ -170,8 +177,12 @@ If you must use a blocking library, wrap the blocking call in `await asyncio.to_
 
 ### Idempotency
 
-For critical tasks that write to a database, ensure your `process_record` logic is **idempotent** (running it multiple times has the same effect as running it once). This prevents duplicate writes if a job is restarted after a partial failure.
+For critical tasks that write to a database, ensure your `process_record` logic is **idempotent** (running an operation multiple times has the same effect as running it once). This prevents duplicate writes if a job is restarted after a partial failure.
 
 ### Forcing Reruns
 
 To re-process specific, already completed items, set the `RERUN_KEY` in `config.py` (e.g., to `"force_rerun"`). In your `output.jsonl` file, add this key to any record you want to re-run (e.g., `{"id": "...", "force_rerun": true}`). The framework will pick it up on the next run.
+
+## License
+
+This project is licensed under the MIT License.
