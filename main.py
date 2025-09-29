@@ -8,7 +8,7 @@ import asyncio
 import os
 import sys
 
-from aiologger import logger as aiologger
+import aiologger
 from aiologger.handlers.streams import AsyncStreamHandler
 from aiologger.handlers.files import AsyncFileHandler
 from aiologger.formatters.base import Formatter
@@ -19,12 +19,12 @@ from core_processor import JsonlBatchProcessor
 from user_logic import process_record, on_startup, on_shutdown
 
 # 获取一个异步 logger 实例
-logger = aiologger.get_logger(__name__)
+logger = aiologger.getLogger(__name__)
 
 def setup_logging():
     """配置 aiologger 日志系统，使其能够同时异步输出到控制台和文件。"""
     log_level = getattr(aiologger, settings.LOG_LEVEL.upper(), aiologger.INFO)
-    root_logger = aiologger.get_logger()
+    root_logger = aiologger.getLogger()
     root_logger.level = log_level
     formatter = Formatter('%(asctime)s - %(name)-20s - %(levelname)-8s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
     

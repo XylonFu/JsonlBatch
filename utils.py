@@ -7,10 +7,9 @@
 import asyncio
 import random
 from functools import wraps
+import aiologger
 
-from aiologger import logger as aiologger
-
-logger = aiologger.get_logger(__name__)
+logger = aiologger.getLogger(__name__)
 
 def retry_with_backoff(retries: int = 3, initial_delay: float = 1, backoff_factor: float = 2):
     """

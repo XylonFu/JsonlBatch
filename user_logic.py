@@ -6,13 +6,13 @@
 包括：资源初始化(`on_startup`)、核心处理(`process_record`)和资源清理(`on_shutdown`)。
 """
 from typing import Dict, Any
-from aiologger import logger as aiologger
+import aiologger
 
 # 从工具模块导入可复用的组件
 from utils import retry_with_backoff
 
 # 获取一个异步 logger 实例
-logger = aiologger.get_logger(__name__)
+logger = aiologger.getLogger(__name__)
 
 # ==============================================================================
 # 1. 定义生命周期钩子 (Lifecycle Hooks)
