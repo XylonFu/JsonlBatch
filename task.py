@@ -1,4 +1,4 @@
-# user_logic.py
+# task.py
 """
 用户业务逻辑模块 (User Logic Module)。
 
@@ -6,8 +6,7 @@
 包括：资源初始化(`on_startup`)、核心处理(`process_record`)和资源清理(`on_shutdown`)。
 """
 from typing import Dict, Any
-from aiologger import logger
-
+from logging_config import logger
 from utils import retry_with_backoff
 
 # ==============================================================================
@@ -79,6 +78,6 @@ async def process_record(record: Dict[str, Any], context: Dict[str, Any]) -> Dic
         response.raise_for_status()
         api_data = await response.json()
         
-        record["processed_by"] = "JsonlBatch v4.0 Final"
+        record["processed_by"] = "JsonlBatch v5.0 Final"
         record["api_args"] = api_data["args"]
         return record

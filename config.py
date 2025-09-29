@@ -27,7 +27,7 @@ class Settings:
 
     # --- 2. 核心标识符配置 ---
     # 记录的唯一标识符键名，用于断点续跑。
-    # e.g., 在 `{"id": "user_123", ...}` 中, ID_KEY 应为 "id"。
+    # Example: 在 `{"id": "user_123", ...}` 中, ID_KEY 应为 "id"。
     ID_KEY: ClassVar[str] = "id"
 
     # (可选) 强制重跑标识符的键名。设为 `None` 可禁用此功能。
@@ -45,5 +45,5 @@ class Settings:
     # 日志级别，可选值: 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'
     LOG_LEVEL: ClassVar[str] = "INFO"
 
-# 创建一个全局唯一的配置实例供其他模块导入。
+# 创建一个全局唯一的配置实例，供其他模块导入。
 settings = Settings()

@@ -1,4 +1,4 @@
-# core_processor.py
+# processor.py
 """
 JsonlBatch 框架核心处理器 (完全异步版)。
 
@@ -13,8 +13,9 @@ from typing import Callable, Dict, Any, List, Coroutine, TypeAlias, Protocol
 
 import aiofiles
 import aiohttp
-from aiologger import logger
 from tqdm import tqdm
+
+from logging_config import logger
 
 # --- 类型定义，用于清晰地定义接口和函数签名 ---
 ProcessFunction: TypeAlias = Callable[[Dict[str, Any], Dict[str, Any]], Coroutine[Any, Any, Dict[str, Any] | None]]
@@ -22,14 +23,8 @@ LifecycleHook: TypeAlias = Callable[..., Coroutine[Any, Any, Any]]
 
 class ConfigProtocol(Protocol):
     """定义期望的配置对象的结构（“形状”），用于更严格的类型提示。"""
-    INPUT_FILE: str
-    OUTPUT_FILE: str
-    ERROR_FILE: str
-    LOG_FILE: str
-    ID_KEY: str
-    RERUN_KEY: str | None
-    MAX_CONCURRENCY: int
-    WRITE_BATCH_SIZE: int
+    INPUT_FILE: str; OUTPUT_FILE: str; ERROR_FILE: str; LOG_FILE: str
+    ID_KEY: str; RERUN_KEY: str | None; MAX_CONCURRENCY: int; WRITE_BATCH_SIZE: int
 
 class JsonlBatchProcessor:
     """用于网络I/O密集型任务的异步JSONL文件处理器。"""
@@ -43,13 +38,11 @@ class JsonlBatchProcessor:
         """确保所有在配置中定义的输出目录都存在。"""
         for file_path in [self.config.OUTPUT_FILE, self.config.ERROR_FILE, self.config.LOG_FILE]:
             dir_name = os.path.dirname(file_path)
-            if dir_name:
-                os.makedirs(dir_name, exist_ok=True)
+            if dir_name: os.makedirs(dir_name, exist_ok=True)
 
     async def _load_processed_state(self):
         """从输出文件异步加载已处理记录的状态，以实现断点续跑。"""
-        if not os.path.exists(self.config.OUTPUT_FILE):
-            return
+        if not os.path.exists(self.config.OUTPUT_FILE): return
         
         await logger.info(f"正在从 '{self.config.OUTPUT_FILE}' 加载已处理记录...")
         async with aiofiles.open(self.config.OUTPUT_FILE, 'r', encoding='utf-8') as f:
@@ -162,7 +155,6 @@ class JsonlBatchProcessor:
             async with aiohttp.ClientSession() as session:
                 context['session'] = session
                 success_count, error_count = await self._run_processing_loop(tasks_to_process, process_function, context)
-
         finally:
             if on_shutdown:
                 await on_shutdown(context)

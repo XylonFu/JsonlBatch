@@ -18,25 +18,26 @@ It provides an elegant, out-of-the-box solution for processing large JSONL datas
 
 ## Key Features
 
-  - 🚀 **High-Performance Concurrency**: Utilizes `asyncio` to handle thousands of concurrent I/O tasks efficiently, maximizing throughput.
+  - 🚀 **High-Performance Concurrency**: Utilizes `asyncio` to handle a high volume of concurrent I/O tasks efficiently, maximizing throughput.
   - 🛡️ **Resilient & Resumable**: Never lose work on interruptions. Automatically tracks and skips completed tasks on restart.
   - ⚡ **Fully Asynchronous**: Employs an end-to-end non-blocking I/O pipeline with `aiofiles` and `aiologger` for a truly stall-free performance.
-  - 📦 **Managed Resource Lifecycle**: Provides `on_startup` and `on_shutdown` hooks to gracefully initialize and release shared resources like database connections and API clients.
+  - 📦 **Managed Resource Lifecycle**: Provides `on_startup` and `on_shutdown` hooks to gracefully initialize and release shared resources.
   - ✍️ **Efficient Batch Writing**: Buffers results and writes them to disk in batches to minimize I/O overhead.
-  - 💣 **Granular Error Handling**: Isolates failures to individual records. Failed items are logged with rich context to a separate error file without halting the entire process.
-  - 🔄 **Built-in Retry Logic**: Includes a ready-to-use `@retry_with_backoff` decorator with exponential backoff and jitter to handle transient network errors.
+  - 💣 **Granular Error Handling**: Isolates failures to individual records. Failed items are logged with rich context to a separate error file without halting the process.
+  - 🔄 **Built-in Retry Logic**: Includes a ready-to-use `@retry_with_backoff` decorator to handle transient network errors gracefully.
   - 📊 **Real-time Progress & Reporting**: Displays a dynamic `tqdm` progress bar with live success/failure counts and generates a detailed statistical summary upon completion.
 
 ## Project Structure
 
-The framework is organized into five well-defined modules for maximum clarity and maintainability.
+The framework is organized into six well-defined modules for maximum clarity and maintainability.
 
 ```
 your_project/
 ├── config.py             # Your single source of truth for all settings.
+├── logging_config.py     # Centralized configuration for the async logger.
 ├── utils.py              # Houses reusable, business-agnostic components.
-├── core_processor.py     # The framework's engine. You should not need to edit this.
-├── user_logic.py         # Your workspace. Implement your task-specific logic here.
+├── processor.py          # The framework's engine. You should not need to edit this.
+├── task.py               # Your workspace. Implement your task-specific logic here.
 └── main.py               # The application's generic entry point.
 ```
 
@@ -51,7 +52,7 @@ your_project/
 
 #### 1\. Installation
 
-The framework requires Python 3.9+. Place the five framework files in your project directory and install the dependencies:
+The framework requires Python 3.9+. Place the six framework files in your project directory and install the dependencies:
 
 ```bash
 pip install aiohttp tqdm aiofiles aiologger
@@ -70,7 +71,7 @@ class Settings:
     # ...
 ```
 
-#### 3\. Implementation (`user_logic.py`)
+#### 3\. Implementation (`task.py`)
 
 This is where you define your task by implementing three key functions. See "Core Concepts Explained" below for details.
 
@@ -84,7 +85,7 @@ python main.py
 
 ## Core Concepts Explained
 
-The framework interacts with your code through a clear contract defined in `user_logic.py`. You must implement three functions that manage your task's lifecycle.
+The framework interacts with your code through a clear contract defined in `task.py`. You must implement three functions that manage your task's lifecycle.
 
   - `on_startup() -> dict`:
     This coroutine runs **once** before any processing begins. Its purpose is to initialize and return a `context` dictionary containing any shared resources (e.g., SDK clients, database connection pools).
@@ -99,30 +100,30 @@ The `context` object acts as the bridge, safely passing shared resources from st
 
 ## Usage Walkthrough
 
-**Goal**: Enrich a `users.jsonl` file with location data from an external API.
+**Goal**: Enrich a list of IP addresses from a JSONL file with geolocation data from an external API.
 
-**1. Input Data (`data/users.jsonl`)**:
+**1. Input Data (`data/ips.jsonl`)**:
 
 ```json
-{"user_id": 1, "ip_address": "8.8.8.8"}
-{"user_id": 2, "ip_address": "1.1.1.1"}
+{"ip": "8.8.8.8", "source": "Google DNS"}
+{"ip": "1.1.1.1", "source": "Cloudflare DNS"}
 ```
 
 **2. Configuration (`config.py`)**:
 
 ```python
 class Settings:
-    INPUT_FILE: str = "data/users.jsonl"
-    OUTPUT_FILE: str = "data/users_enriched.jsonl"
-    ID_KEY: str = "user_id"
+    INPUT_FILE: str = "data/ips.jsonl"
+    OUTPUT_FILE: str = "data/ips_enriched.jsonl"
+    ID_KEY: str = "ip"
     MAX_CONCURRENCY: int = 10
     # ...
 ```
 
-**3. Logic Implementation (`user_logic.py`)**:
+**3. Logic Implementation (`task.py`)**:
 
 ```python
-# user_logic.py
+# task.py
 from typing import Dict, Any
 from utils import retry_with_backoff
 
@@ -136,9 +137,9 @@ async def on_shutdown(context: Dict[str, Any]):
 @retry_with_backoff(retries=2, initial_delay=5)
 async def process_record(record: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
     session = context['session']  # Use the session provided by the framework
-    ip = record.get("ip_address")
+    ip_address = record.get("ip")
     
-    api_url = f"http://ip-api.com/json/{ip}"
+    api_url = f"http://ip-api.com/json/{ip_address}"
     
     async with session.get(api_url) as response:
         response.raise_for_status()
@@ -152,12 +153,12 @@ async def process_record(record: Dict[str, Any], context: Dict[str, Any]) -> Dic
         return record
 ```
 
-**4. Run & Check Output (`data/users_enriched.jsonl`)**:
+**4. Run & Check Output (`data/ips_enriched.jsonl`)**:
 After running `python main.py`, the output file will contain:
 
 ```json
-{"user_id": 1, "ip_address": "8.8.8.8", "country": "United States", "city": "Mountain View", "isp": "Google LLC"}
-{"user_id": 2, "ip_address": "1.1.1.1", "country": "United States", "city": "Los Angeles", "isp": "Cloudflare, Inc."}
+{"ip": "8.8.8.8", "source": "Google DNS", "country": "United States", "city": "Mountain View", "isp": "Google LLC"}
+{"ip": "1.1.1.1", "source": "Cloudflare DNS", "country": "United States", "city": "Los Angeles", "isp": "Cloudflare, Inc."}
 ```
 
 ## Advanced Topics
@@ -168,12 +169,7 @@ The `utils.py` module provides a powerful `@retry_with_backoff` decorator. Apply
 
 ### Handling Synchronous SDKs
 
-If you must use a blocking library (e.g., a synchronous database driver), wrap the blocking call in `await asyncio.to_thread(...)` to keep the framework responsive.
-
-```python
-# Inside process_record
-# blocking_result = await asyncio.to_thread(my_sync_sdk.call, arg1)
-```
+If you must use a blocking library (e.g., a synchronous database driver), wrap the blocking call in `await asyncio.to_thread(...)` inside your `process_record` function to keep the framework responsive.
 
 ### Idempotency
 

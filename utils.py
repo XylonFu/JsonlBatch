@@ -9,7 +9,7 @@ import random
 from functools import wraps
 from typing import Callable, Coroutine, Any, TypeVar
 
-from aiologger import logger
+from logging_config import logger
 
 # 定义一个类型变量，用于精确注解被装饰的异步函数，以保持类型提示的完整性。
 F = TypeVar('F', bound=Callable[..., Coroutine[Any, Any, Any]])
