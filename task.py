@@ -7,7 +7,6 @@
 """
 from typing import Dict, Any
 from logging_config import logger
-from utils import retry_with_backoff
 
 # ==============================================================================
 # 1. 定义生命周期钩子 (Lifecycle Hooks)
@@ -44,7 +43,6 @@ async def on_shutdown(context: Dict[str, Any]):
 # ==============================================================================
 # 2. 核心业务逻辑实现 (Core Business Logic)
 # ==============================================================================
-@retry_with_backoff(retries=3, initial_delay=2)
 async def process_record(record: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any] | None:
     """
     处理单条记录的异步函数。

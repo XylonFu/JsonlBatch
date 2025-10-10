@@ -25,7 +25,7 @@ It provides an elegant, out-of-the-box solution for processing large JSONL datas
   - 📦 **Managed Resource Lifecycle**: Provides `on_startup` and `on_shutdown` hooks to gracefully initialize and release shared resources.
   - ✍️ **Efficient Batch Writing**: Buffers results and writes them to disk in batches to minimize I/O overhead.
   - 💣 **Granular Error Handling**: Isolates failures to individual records. Failed items are logged with rich context to a separate error file without halting the process.
-  - 🔄 **Built-in Retry Logic**: Includes a ready-to-use `@retry_with_backoff` decorator to handle transient network errors gracefully.
+  - 🔄 **Automatic Retries**: Automatically retries failed tasks with exponential backoff, configured globally in `config.py`.
   - 📊 **Real-time Progress & Reporting**: Displays a dynamic `tqdm` progress bar with live success/failure counts and generates a detailed statistical summary upon completion.
 
 ## Project Structure
@@ -70,6 +70,8 @@ class Settings:
     ID_KEY: str = "id"
     MAX_CONCURRENCY: int = 50
     REQUESTS_PER_MINUTE: int = 0
+    MAX_RETRIES: int = 3
+    RETRY_INITIAL_DELAY: float = 2.0
     # ...
 ```
 
@@ -120,6 +122,8 @@ class Settings:
     ID_KEY: str = "ip"
     MAX_CONCURRENCY: int = 10
     REQUESTS_PER_MINUTE: int = 120
+    MAX_RETRIES: int = 2
+    RETRY_INITIAL_DELAY: float = 5.0
     # ...
 ```
 
@@ -128,7 +132,6 @@ class Settings:
 ```python
 # task.py
 from typing import Dict, Any
-from utils import retry_with_backoff
 
 # No special resources are needed for this simple task.
 async def on_startup() -> Dict[str, Any]:
@@ -137,7 +140,8 @@ async def on_startup() -> Dict[str, Any]:
 async def on_shutdown(context: Dict[str, Any]):
     pass
 
-@retry_with_backoff(retries=2, initial_delay=5)
+# Note: The retry decorator is no longer needed here.
+# The framework handles retries automatically based on config.py settings.
 async def process_record(record: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
     session = context['session']  # Use the session provided by the framework
     ip_address = record.get("ip")
@@ -170,14 +174,17 @@ After running `python main.py`, the output file will contain:
 
 The framework provides two parameters to control how you interact with external services: `MAX_CONCURRENCY` and `REQUESTS_PER_MINUTE`. It's important to understand their roles:
 
-  - **`MAX_CONCURRENCY`**: This limits how many tasks can be *running in parallel* at any single moment. It's like setting the number of workers on an assembly line. This is useful for managing your system's resources (memory, open connections) and for services that limit concurrent connections.
-  - **`REQUESTS_PER_MINUTE`**: This controls the *overall rate* at which new tasks are started. It's like setting the speed of the conveyor belt feeding the assembly line. This is essential for APIs that have a strict rate limit (e.g., "100 calls per minute").
+  - **`MAX_CONCURRENCY`**: This limits how many tasks can be *running in parallel* at any single moment. It's like setting the number of workers on an assembly line.
+  - **`REQUESTS_PER_MINUTE`**: This controls the *overall rate* at which new tasks are started. It's like setting the speed of the conveyor belt feeding the assembly line.
 
-Set `REQUESTS_PER_MINUTE` to a positive integer in `config.py` to enable it. The framework will automatically introduce the necessary delay between starting each task to meet the target rate. Setting it to `0` disables this feature, relying solely on `MAX_CONCURRENCY`.
+### Automatic Retries
 
-### Retry Decorator
+The framework has a built-in, robust retry mechanism to handle transient errors automatically. **You no longer need to add any decorators** to your `process_record` function.
 
-The `utils.py` module provides a powerful `@retry_with_backoff` decorator. Apply it to your `process_record` function to automatically handle transient network errors.
+You can configure the retry behavior globally in `config.py`:
+
+  - `MAX_RETRIES`: The maximum number of times to retry a failed task.
+  - `RETRY_INITIAL_DELAY`: The initial wait time in seconds before the first retry. The delay increases exponentially for subsequent retries.
 
 ### Handling Synchronous SDKs
 

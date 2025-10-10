@@ -2,7 +2,7 @@
 """
 JsonlBatch 框架核心处理器 (完全异步版)。
 
-封装了并发控制、断点续跑、异步批量I/O、异步日志记录和进度显示等核心功能。
+封装了并发控制、速率控制、断点续跑、异步批量I/O、异步日志记录和进度显示等核心功能。
 通过生命周期钩子和配置注入，实现了与业务逻辑和配置的完全解耦。
 """
 import asyncio
@@ -16,6 +16,7 @@ import aiohttp
 from tqdm import tqdm
 
 from logging_config import logger
+from utils import retry_with_backoff
 
 # --- 类型定义，用于清晰地定义接口和函数签名 ---
 ProcessFunction: TypeAlias = Callable[[Dict[str, Any], Dict[str, Any]], Coroutine[Any, Any, Dict[str, Any] | None]]
@@ -26,6 +27,7 @@ class ConfigProtocol(Protocol):
     INPUT_FILE: str; OUTPUT_FILE: str; ERROR_FILE: str; LOG_FILE: str
     ID_KEY: str; RERUN_KEY: str | None
     MAX_CONCURRENCY: int; REQUESTS_PER_MINUTE: int; WRITE_BATCH_SIZE: int
+    MAX_RETRIES: int; RETRY_INITIAL_DELAY: float
 
 class JsonlBatchProcessor:
     """用于网络I/O密集型任务的异步JSONL文件处理器。"""
@@ -107,18 +109,25 @@ class JsonlBatchProcessor:
         if request_delay > 0:
             await logger.info(f"速率限制已启用: 每分钟 {rpm} 次请求 (请求最小间隔: {request_delay:.2f} 秒)。")
 
+        async def rate_limited_process(task: Dict):
+            if request_delay > 0:
+                async with self._rate_limit_lock:
+                    now = time.monotonic()
+                    elapsed = now - self._last_request_time
+                    if elapsed < request_delay:
+                        await asyncio.sleep(request_delay - elapsed)
+                    self._last_request_time = time.monotonic()
+            return await process_func(task, context)
+        
+        robust_processor = retry_with_backoff(
+            retries=self.config.MAX_RETRIES,
+            initial_delay=self.config.RETRY_INITIAL_DELAY
+        )(rate_limited_process)
+
         async def worker(task: Dict):
             async with semaphore:
-                if request_delay > 0:
-                    async with self._rate_limit_lock:
-                        now = time.monotonic()
-                        elapsed = now - self._last_request_time
-                        if elapsed < request_delay:
-                            await asyncio.sleep(request_delay - elapsed)
-                        self._last_request_time = time.monotonic()
-                
                 try:
-                    return await process_func(task, context)
+                    return await robust_processor(task)
                 except Exception as e:
                     return e, task
 
@@ -131,7 +140,7 @@ class JsonlBatchProcessor:
                 if isinstance(result, tuple) and isinstance(result[0], Exception):
                     exc, original_task = result
                     task_id = original_task.get(self.config.ID_KEY, "N/A")
-                    await logger.error(f"记录 '{task_id}' 处理失败: {exc}", exc_info=True)
+                    await logger.error(f"记录 '{task_id}' 在所有重试后处理失败: {exc}", exc_info=False)
                     errors_batch.append({ "record_id": task_id, "error_message": str(exc), "original_record": original_task })
                     error_count += 1
                 elif result is not None:

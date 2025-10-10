@@ -45,6 +45,12 @@ class Settings:
     # 结果写入文件的批量大小，以减少I/O开销。
     WRITE_BATCH_SIZE: ClassVar[int] = 100
 
+    # 最大重试次数。
+    MAX_RETRIES: ClassVar[int] = 3
+    
+    # 首次重试前的初始延迟（秒）。后续重试的延迟会以指数级增长。
+    RETRY_INITIAL_DELAY: ClassVar[float] = 2.0
+
     # --- 4. 日志配置 ---
     # 日志级别，可选值: 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'
     LOG_LEVEL: ClassVar[str] = "INFO"
