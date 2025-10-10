@@ -24,7 +24,8 @@ LifecycleHook: TypeAlias = Callable[..., Coroutine[Any, Any, Any]]
 class ConfigProtocol(Protocol):
     """定义期望的配置对象的结构（“形状”），用于更严格的类型提示。"""
     INPUT_FILE: str; OUTPUT_FILE: str; ERROR_FILE: str; LOG_FILE: str
-    ID_KEY: str; RERUN_KEY: str | None; MAX_CONCURRENCY: int; WRITE_BATCH_SIZE: int
+    ID_KEY: str; RERUN_KEY: str | None
+    MAX_CONCURRENCY: int; REQUESTS_PER_MINUTE: int; WRITE_BATCH_SIZE: int
 
 class JsonlBatchProcessor:
     """用于网络I/O密集型任务的异步JSONL文件处理器。"""
@@ -106,8 +107,19 @@ class JsonlBatchProcessor:
                 except Exception as e:
                     return e, task
         
-        coroutines = [worker(task) for task in tasks]
-        pbar = tqdm(asyncio.as_completed(coroutines), total=len(tasks), desc="处理中")
+        rpm = self.config.REQUESTS_PER_MINUTE
+        request_delay = 60.0 / rpm if rpm and rpm > 0 else 0
+
+        task_futures = []
+        if request_delay > 0:
+            await logger.info(f"速率限制已启用: 每分钟 {rpm} 次请求 (任务启动间隔: {request_delay:.2f} 秒)。")
+        
+        for task in tasks:
+            task_futures.append(asyncio.create_task(worker(task)))
+            if request_delay > 0:
+                await asyncio.sleep(request_delay)
+        
+        pbar = tqdm(asyncio.as_completed(task_futures), total=len(tasks), desc="处理中")
         
         try:
             for future in pbar:

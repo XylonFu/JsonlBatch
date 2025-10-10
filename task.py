@@ -78,6 +78,6 @@ async def process_record(record: Dict[str, Any], context: Dict[str, Any]) -> Dic
         response.raise_for_status()
         api_data = await response.json()
         
-        record["processed_by"] = "JsonlBatch v5.0 Final"
+        record["processed_by"] = "JsonlBatch"
         record["api_args"] = api_data["args"]
         return record

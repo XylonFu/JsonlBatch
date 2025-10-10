@@ -38,6 +38,10 @@ class Settings:
     # 最大并发任务数，需根据目标API的速率限制进行调整。
     MAX_CONCURRENCY: ClassVar[int] = 100
 
+    # 每分钟最大请求数。这将在任务启动之间引入延迟以控制请求速率。
+    # 设置为 0 可禁用此限制，仅依赖 MAX_CONCURRENCY。
+    REQUESTS_PER_MINUTE: ClassVar[int] = 0
+
     # 结果写入文件的批量大小，以减少I/O开销。
     WRITE_BATCH_SIZE: ClassVar[int] = 100
 

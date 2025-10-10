@@ -20,6 +20,7 @@ It provides an elegant, out-of-the-box solution for processing large JSONL datas
 
   - 🚀 **High-Performance Concurrency**: Utilizes `asyncio` to handle a high volume of concurrent I/O tasks efficiently, maximizing throughput.
   - 🛡️ **Resilient & Resumable**: Never lose work on interruptions. Automatically tracks and skips completed tasks on restart.
+  - ⏱️ **Built-in Rate Limiting**: Easily conform to API limits by setting a maximum number of requests per minute.
   - ⚡ **Fully Asynchronous**: Employs an end-to-end non-blocking I/O pipeline with `aiofiles` and `aiologger` for a truly stall-free performance.
   - 📦 **Managed Resource Lifecycle**: Provides `on_startup` and `on_shutdown` hooks to gracefully initialize and release shared resources.
   - ✍️ **Efficient Batch Writing**: Buffers results and writes them to disk in batches to minimize I/O overhead.
@@ -68,6 +69,7 @@ class Settings:
     OUTPUT_FILE: str = "data/output.jsonl"
     ID_KEY: str = "id"
     MAX_CONCURRENCY: int = 50
+    REQUESTS_PER_MINUTE: int = 0
     # ...
 ```
 
@@ -117,6 +119,7 @@ class Settings:
     OUTPUT_FILE: str = "data/ips_enriched.jsonl"
     ID_KEY: str = "ip"
     MAX_CONCURRENCY: int = 10
+    REQUESTS_PER_MINUTE: int = 120
     # ...
 ```
 
@@ -162,6 +165,15 @@ After running `python main.py`, the output file will contain:
 ```
 
 ## Advanced Topics
+
+### Rate Limiting
+
+The framework provides two parameters to control how you interact with external services: `MAX_CONCURRENCY` and `REQUESTS_PER_MINUTE`. It's important to understand their roles:
+
+  - **`MAX_CONCURRENCY`**: This limits how many tasks can be *running in parallel* at any single moment. It's like setting the number of workers on an assembly line. This is useful for managing your system's resources (memory, open connections) and for services that limit concurrent connections.
+  - **`REQUESTS_PER_MINUTE`**: This controls the *overall rate* at which new tasks are started. It's like setting the speed of the conveyor belt feeding the assembly line. This is essential for APIs that have a strict rate limit (e.g., "100 calls per minute").
+
+Set `REQUESTS_PER_MINUTE` to a positive integer in `config.py` to enable it. The framework will automatically introduce the necessary delay between starting each task to meet the target rate. Setting it to `0` disables this feature, relying solely on `MAX_CONCURRENCY`.
 
 ### Retry Decorator
 

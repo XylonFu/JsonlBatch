@@ -17,7 +17,7 @@ from task import process_record, on_startup, on_shutdown
 async def main():
     """异步主函数，负责编排整个处理流程。"""
     await logger.info("="*50)
-    await logger.info(f"JsonlBatch v5.0 (Final) 异步处理器启动")
+    await logger.info(f"JsonlBatch 异步处理器启动")
     
     try:
         # 配置注入：将配置实例传递给处理器
