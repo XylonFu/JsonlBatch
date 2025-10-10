@@ -34,6 +34,8 @@ class JsonlBatchProcessor:
         self.config = config
         self.processed_ids: set = set()
         self._file_write_lock = asyncio.Lock()
+        self._rate_limit_lock = asyncio.Lock()
+        self._last_request_time = 0
 
     async def _ensure_dir_exists(self):
         """确保所有在配置中定义的输出目录都存在。"""
@@ -99,27 +101,29 @@ class JsonlBatchProcessor:
         results_batch, errors_batch = [], []
         success_count, error_count = 0, 0
         semaphore = asyncio.Semaphore(self.config.MAX_CONCURRENCY)
+        
+        rpm = self.config.REQUESTS_PER_MINUTE
+        request_delay = 60.0 / rpm if rpm and rpm > 0 else 0
+        if request_delay > 0:
+            await logger.info(f"速率限制已启用: 每分钟 {rpm} 次请求 (请求最小间隔: {request_delay:.2f} 秒)。")
 
         async def worker(task: Dict):
             async with semaphore:
+                if request_delay > 0:
+                    async with self._rate_limit_lock:
+                        now = time.monotonic()
+                        elapsed = now - self._last_request_time
+                        if elapsed < request_delay:
+                            await asyncio.sleep(request_delay - elapsed)
+                        self._last_request_time = time.monotonic()
+                
                 try:
                     return await process_func(task, context)
                 except Exception as e:
                     return e, task
-        
-        rpm = self.config.REQUESTS_PER_MINUTE
-        request_delay = 60.0 / rpm if rpm and rpm > 0 else 0
 
-        task_futures = []
-        if request_delay > 0:
-            await logger.info(f"速率限制已启用: 每分钟 {rpm} 次请求 (任务启动间隔: {request_delay:.2f} 秒)。")
-        
-        for task in tasks:
-            task_futures.append(asyncio.create_task(worker(task)))
-            if request_delay > 0:
-                await asyncio.sleep(request_delay)
-        
-        pbar = tqdm(asyncio.as_completed(task_futures), total=len(tasks), desc="处理中")
+        coroutines = [worker(task) for task in tasks]
+        pbar = tqdm(asyncio.as_completed(coroutines), total=len(tasks), desc="处理中")
         
         try:
             for future in pbar:
