@@ -55,7 +55,7 @@ class JsonlBatchProcessor:
                 try:
                     data = json.loads(line)
                     record_id = data.get(self.config.ID_KEY)
-                    if not record_id: continue
+                    if record_id is None: continue
                     if self.config.RERUN_KEY and self.config.RERUN_KEY in data: continue
                     self.processed_ids.add(record_id)
                 except json.JSONDecodeError:
@@ -76,7 +76,7 @@ class JsonlBatchProcessor:
                 try:
                     data = json.loads(line)
                     record_id = data.get(self.config.ID_KEY)
-                    if not record_id:
+                    if record_id is None:
                         await logger.warning(f"输入文件第 {line_num} 行记录缺少ID键 '{self.config.ID_KEY}'，已跳过。")
                         continue
                     if record_id not in self.processed_ids:
